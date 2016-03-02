@@ -1,7 +1,11 @@
 package edu.buffalo.record;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
+import android.renderscript.ScriptGroup;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -17,18 +21,22 @@ public class MainActivity extends AppCompatActivity {
 
     private PlayStuff mPlayStuff = null;
 
+    private IBinder recordBinder;
+    private ServiceConnection recordService;
+    private Context mContext;
+
 
     class PlayStuff extends Button {
         boolean mStart = true;
 
         OnClickListener clicker = new OnClickListener() {
             public void onClick(View v) {
-                Intent serviceIntent = new Intent(getContext(), RecordService.class);
+                Intent serviceIntent = new Intent(getContext(), RecorderService.class);
                 if (mStart) {
-                    serviceIntent.setAction(RecordService.ACTION_START_RECORD);
+                    serviceIntent.setAction(RecorderService.ACTION_START_RECORD);
                     setText("Stop Playback");
                 } else {
-                    serviceIntent.setAction(RecordService.ACTION_STOP_RECORD);
+                    serviceIntent.setAction(RecorderService.ACTION_STOP_RECORD);
                     setText("Start Playback");
                 }
                 startService(serviceIntent);
@@ -43,12 +51,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public MainActivity(){
+        recordService = new ServiceConnection(){
+
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+            }
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+
+            }
+        };
+        mContext = this;
     }
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        bindService(new Intent(this, RecorderService.class), recordService, Context.BIND_AUTO_CREATE);
         LinearLayout ll = new LinearLayout(this);
 
         mPlayStuff = new PlayStuff(this);
@@ -58,6 +80,15 @@ public class MainActivity extends AppCompatActivity {
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         0));
         setContentView(ll);
+    }
+    @Override
+    protected void onDestroy(){
+        if(recordService!=null){
+            unbindService(recordService);
+            recordService = null;
+            recordBinder = null;
+        }
+        super.onDestroy();
     }
 
     @Override

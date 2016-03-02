@@ -1,91 +1,51 @@
 package edu.buffalo.record;
 
-import android.app.IntentService;
+import android.app.Service;
 import android.content.Intent;
-import android.content.Context;
+import android.os.Binder;
+import android.os.IBinder;
+import android.util.Log;
 
-/**
- * An {@link IntentService} subclass for handling asynchronous task requests in
- * a service on a separate handler thread.
- * <p/>
- * TODO: Customize class - update intent actions, extra parameters and static
- * helper methods.
- */
-public class ProcessingService extends IntentService {
-    // TODO: Rename actions, choose action names that describe tasks that this
-    // IntentService can perform, e.g. ACTION_FETCH_NEW_ITEMS
-    private static final String ACTION_FOO = "edu.buffalo.record.action.FOO";
-    private static final String ACTION_BAZ = "edu.buffalo.record.action.BAZ";
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
-    // TODO: Rename parameters
-    private static final String EXTRA_PARAM1 = "edu.buffalo.record.extra.PARAM1";
-    private static final String EXTRA_PARAM2 = "edu.buffalo.record.extra.PARAM2";
+public class ProcessingService extends Service {
+    public static final String ACTION_START_PROCESS = "edu.buffalo.record.action.ACTION_START_PROCESS";
+//    public static final String ACTION_PROCESS_FRAMES = "edu.buffalo.record.action.ACTION_PROCESS_FRAMES";
+//    public static final String ACTION_CONFIG_CHANGE = "edu.buffalo.record.action.ACTION_CONFIG_CHANGE";
+    private static final String TAG = "ProcessingService";
 
-    /**
-     * Starts this service to perform action Foo with the given parameters. If
-     * the service is already performing a task this action will be queued.
-     *
-     * @see IntentService
-     */
-    // TODO: Customize helper method
-    public static void startActionFoo(Context context, String param1, String param2) {
-        Intent intent = new Intent(context, ProcessingService.class);
-        intent.setAction(ACTION_FOO);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
-
-    /**
-     * Starts this service to perform action Baz with the given parameters. If
-     * the service is already performing a task this action will be queued.
-     *
-     * @see IntentService
-     */
-    // TODO: Customize helper method
-    public static void startActionBaz(Context context, String param1, String param2) {
-        Intent intent = new Intent(context, ProcessingService.class);
-        intent.setAction(ACTION_BAZ);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
+    private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private ScheduledFuture<?> scheduledTask;
 
     public ProcessingService() {
-        super("ProcessingService");
     }
 
     @Override
-    protected void onHandleIntent(Intent intent) {
-        if (intent != null) {
-            final String action = intent.getAction();
-            if (ACTION_FOO.equals(action)) {
-                final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                handleActionFoo(param1, param2);
-            } else if (ACTION_BAZ.equals(action)) {
-                final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                handleActionBaz(param1, param2);
+    public IBinder onBind(Intent intent) {
+        return new Binder();
+    }
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId){
+        if(intent!=null){
+            Log.v(TAG, "Intent received " + intent.getAction());
+            if(ACTION_START_PROCESS.equals(intent.getAction())){
+                Log.v(TAG, "Starting processing action");
+                startProcessing();
             }
         }
+        return START_STICKY;
     }
-
-    /**
-     * Handle action Foo in the provided background thread with the provided
-     * parameters.
-     */
-    private void handleActionFoo(String param1, String param2) {
-        // TODO: Handle action Foo
-        throw new UnsupportedOperationException("Not yet implemented");
+    private void startProcessing(){
+        scheduler.scheduleAtFixedRate(new ProcessingTask(), 25, 8, TimeUnit.MILLISECONDS);
     }
+    private class ProcessingTask implements Runnable{
 
-    /**
-     * Handle action Baz in the provided background thread with the provided
-     * parameters.
-     */
-    private void handleActionBaz(String param1, String param2) {
-        // TODO: Handle action Baz
-        throw new UnsupportedOperationException("Not yet implemented");
+        @Override
+        public void run() {
+            //TODO check message queue for new frames
+        }
     }
 }
