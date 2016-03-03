@@ -22,9 +22,11 @@ public class ProcessingService extends Service {
     public static final int MESSAGE_CONTAINS_BUFFER = 2;
     public static final int MESSAGE_CONFIG_CHANGE = 3;
     public static final int MESSAGE_STOP_PROCESS = 4;
+    private static int volume;
 //    public static final String ACTION_PROCESS_FRAMES = "edu.buffalo.record.action.ACTION_PROCESS_FRAMES";
 //    public static final String ACTION_CONFIG_CHANGE = "edu.buffalo.record.action.ACTION_CONFIG_CHANGE";
     private static final String TAG = "ProcessingService";
+    private boolean mStarted = false;
 
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> scheduledTask;
@@ -36,12 +38,14 @@ public class ProcessingService extends Service {
     public final Messenger mBuffer = new Messenger(new MessageHandler());
 
     public ProcessingService() {
+        volume = 0;
     }
     private class MessageHandler extends Handler {
         public void handleMessage(Message msg){
             Log.v(TAG, "Incoming Message " + msg.what);
             switch(msg.what){
                 case MESSAGE_START_PROCESS:
+                    mStarted = true;
                     startProcessing();
                     break;
                 case MESSAGE_CONTAINS_BUFFER:
@@ -50,9 +54,10 @@ public class ProcessingService extends Service {
                     addFramesToQueue(buffer);
                     break;
                 case MESSAGE_CONFIG_CHANGE:
-                    //TODO config change functions
+                    configChange((int)msg.obj);
                     break;
                 case MESSAGE_STOP_PROCESS:
+                    mStarted = false;
                     stopProcessing();
             }
         }
@@ -100,7 +105,12 @@ public class ProcessingService extends Service {
             //TODO check config change
         }
     }
+
     private void process(short[] buffer){
         Log.e(TAG, "Do some processing with " + buffer);
+    }
+    private void configChange(int conf){
+        volume += conf;
+        Log.v(TAG, "Config change change volume " + volume);
     }
 }
