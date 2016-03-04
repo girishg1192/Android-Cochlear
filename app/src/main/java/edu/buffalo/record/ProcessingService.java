@@ -1,6 +1,7 @@
 package edu.buffalo.record;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.Handler;
@@ -10,6 +11,10 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
 
+import java.nio.Buffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Executors;
@@ -33,7 +38,7 @@ public class ProcessingService extends Service {
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> scheduledTask;
 
-    private static Queue<short[]> bufferQueue= new LinkedList<short[]>();
+    private static Queue<BufferClass> bufferQueue= new LinkedList<BufferClass>();
     private static Queue<ConfClass> messageQueue = new LinkedList<ConfClass>();
 
     public final Messenger mBuffer = new Messenger(new MessageHandler());
@@ -60,8 +65,8 @@ public class ProcessingService extends Service {
                     startProcessing();
                     break;
                 case MESSAGE_CONTAINS_BUFFER:
-                    short[] buffer = (short[])msg.obj;
-                    Log.v(TAG, "Buffer " + buffer + " of size " + buffer.length);
+                    BufferClass buffer = (BufferClass)msg.obj;
+                    Log.v(TAG, "Buffer " + buffer + " of size " + buffer.buffer.length);
                     addFramesToQueue(buffer);
                     break;
                 case MESSAGE_CONFIG_CHANGE:
@@ -106,7 +111,7 @@ public class ProcessingService extends Service {
         scheduledTask.cancel(true);
     }
 
-    private void addFramesToQueue(short[] buffer){
+    private void addFramesToQueue(BufferClass buffer){
         bufferQueue.add(buffer);
     }
     private void addMessageToQueue(ConfClass conf){
@@ -116,7 +121,7 @@ public class ProcessingService extends Service {
     private class ProcessingTask implements Runnable{
         @Override
         public void run() {
-            short[] buffer;
+            BufferClass buffer;
             //TODO while loop?
             if(!bufferQueue.isEmpty()){
                 buffer = bufferQueue.remove();
@@ -141,12 +146,14 @@ public class ProcessingService extends Service {
         }
     }
 
-    private void process(short[] buffer){
+    private void process(BufferClass buffer_){
+        short[] buffer = buffer_.buffer;
         Log.e(TAG, "Do some processing with " + buffer + " " + buffer.length);
         int windowSize = 2048; //Modify to allow multiple sampling rates
         Complex[] fftBins = new Complex[windowSize];
         double[] scaledValues = new double[windowSize];
-        double[] channelMagnitude = new double[22];
+        //double[] channelMagnitude = new double[22];
+        ArrayList<Double> channelMagnitude = new ArrayList<>();
 
         //Apply volume
         for(int i=0; i<buffer.length; i++){
@@ -184,19 +191,23 @@ public class ProcessingService extends Service {
                 double abs = fftBins[bin].abs();
                 magnitude+= abs*abs;
             }
-            channelMagnitude[channels] = magnitude;
+            magnitude = Math.sqrt(magnitude);
+            channelMagnitude.add(Double.valueOf(magnitude));
         }
+        Collections.sort(channelMagnitude);
+        buffer_.result = (Double[])channelMagnitude.toArray().clone();
 
         //Sort the channels and select first few
         //TODO send to receiver
+        Intent publishResult = new Intent(this, ResultReceiver.class);
 
-        Log.v(TAG, "fftResult" + fftBins.length);
+        Log.v(TAG, "fftResult" + channelMagnitude.size());
     }
     private void configChange(ConfClass conf){
         currConfig.volume += conf.volumeChange;
         if(currConfig.volume>10)currConfig.volume = 10;
         if(currConfig.volume<0)currConfig.volume = 0;
         Log.v(TAG, "Config change change volume " + currConfig.volume);
-
     }
 }
+

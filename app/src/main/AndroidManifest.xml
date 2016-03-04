@@ -29,6 +29,11 @@
             android:enabled="true"
             android:exported="true" >
         </service>
+        <service
+            android:name=".ResultReceiver"
+            android:enabled="true"
+            android:exported="true" >
+        </service>
     </application>
 
 </manifest>

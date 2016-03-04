@@ -15,6 +15,7 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
 
+import java.nio.Buffer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -32,6 +33,7 @@ public class RecorderService extends Service {
     private static boolean isRecording;
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> scheduledTask;
+
 
     //Messenger for processing service
     Messenger mProcessing = null;
@@ -97,7 +99,9 @@ public class RecorderService extends Service {
         public void run() {
             short[] buffer = new short[bufferSize];
             record.read(buffer, 0, bufferSize);
-            Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffer);
+            long time = System.currentTimeMillis();
+            BufferClass buffObject = new BufferClass(buffer, time);
+            Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffObject);
             try {
                 //Send the buffer to Processing service
                 mProcessing.send(packedBuffer);
