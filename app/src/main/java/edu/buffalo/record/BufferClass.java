@@ -4,9 +4,11 @@ public class BufferClass{
     public short[] buffer;
     public Double[] result;
     public long timeSent;
-    BufferClass(short[] buff, long time){
+    public int seq;
+    BufferClass(short[] buff, long time, int seq_){
         buffer = buff;
         timeSent = time;
+        seq=seq_;
     }
     BufferClass(BufferClass frames, Double[] res){
         timeSent = frames.timeSent;

@@ -2,27 +2,36 @@ package edu.buffalo.record;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
+import android.os.Messenger;
+import android.util.Log;
+
+import java.nio.Buffer;
 
 public class ResultReceiver extends Service {
-    public static String RESULT_PUBLISH = "edu.buffalo.record.action.RESULT_PUBLISH";
+//    public static String RESULT_PUBLISH = "edu.buffalo.record.action.RESULT_PUBLISH";
+    public static final int RESULT_PUBLISH = 1;
+    private static final String TAG = "ResultReceiver";
 
     public ResultReceiver() {
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if(intent!=null){
-            if(RESULT_PUBLISH.equals(intent.getAction())){
-                //TODO
+    public final Messenger mBuffer = new Messenger(new ResultHandler());
+    private class ResultHandler extends Handler {
+        public void handleMessage(Message msg) {
+            switch(msg.what){
+                case RESULT_PUBLISH:
+                    BufferClass result = (BufferClass) msg.obj;
+                    Log.e(TAG, "Result: Time taken = " + result.seq + " " + (System.currentTimeMillis() - result.timeSent));
+                    break;
             }
         }
-        return START_NOT_STICKY;
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-        throw new UnsupportedOperationException("Not yet implemented");
+        return mBuffer.getBinder();
     }
 }

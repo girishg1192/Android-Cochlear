@@ -15,7 +15,6 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
 
-import java.nio.Buffer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -24,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class RecorderService extends Service {
     public static final String ACTION_START_RECORD = "edu.buffalo.record.action.ACTION_START_RECORD";
     public static final String ACTION_STOP_RECORD = "edu.buffalo.record.action.ACTION_STOP_RECORD";
+    private static int seqNo = 0;
 
     private static String TAG = "RecorderService";
 
@@ -91,16 +91,18 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 20, TimeUnit.MILLISECONDS);
+            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 120, TimeUnit.MILLISECONDS);
         }
     }
     private class AudioRecordTask implements Runnable{
         @Override
         public void run() {
             short[] buffer = new short[bufferSize];
-            record.read(buffer, 0, bufferSize);
             long time = System.currentTimeMillis();
-            BufferClass buffObject = new BufferClass(buffer, time);
+            Log.e(TAG, "initial time " + time);
+            record.read(buffer, 0, bufferSize);
+            Log.e(TAG, "initial time 2 " + (time-System.currentTimeMillis()));
+            BufferClass buffObject = new BufferClass(buffer, time, seqNo++);
             Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffObject);
             try {
                 //Send the buffer to Processing service
