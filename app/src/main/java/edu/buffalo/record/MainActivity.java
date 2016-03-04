@@ -7,8 +7,8 @@ import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.Handler;
 import android.os.RemoteException;
-import android.renderscript.ScriptGroup;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,16 +16,15 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import java.security.Key;
 
 public class MainActivity extends AppCompatActivity {
     private static final String LOG_TAG = "AudioRecordTest";
 
-    private PlayStuff mPlayStuff = null;
+    private Button mPlayStuff = null;
 
     //Binders for recording service
     private IBinder recordBinder;
@@ -36,31 +35,6 @@ public class MainActivity extends AppCompatActivity {
     Messenger mProcessingConfig = null;
     boolean mStart = false;
 
-
-
-
-    class PlayStuff extends Button {
-
-        OnClickListener clicker = new OnClickListener() {
-            public void onClick(View v) {
-                Intent serviceIntent = new Intent(getContext(), RecorderService.class);
-                if (!mStart) {
-                    serviceIntent.setAction(RecorderService.ACTION_START_RECORD);
-                    setText("Stop Playback");
-                } else {
-                    serviceIntent.setAction(RecorderService.ACTION_STOP_RECORD);
-                    setText("Start Playback");
-                }
-                startService(serviceIntent);
-                mStart = !mStart;
-            }
-        };
-        public PlayStuff(Context ctx) {
-            super(ctx);
-            setText("Start Loopback");
-            setOnClickListener(clicker);
-        }
-    }
 
     public MainActivity(){
         recordService = new ServiceConnection(){
@@ -84,15 +58,26 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         bindService(new Intent(this, RecorderService.class), recordService, Context.BIND_AUTO_CREATE);
         bindService(new Intent(this, ProcessingService.class), mProcessingConnection, Context.BIND_AUTO_CREATE);
-        LinearLayout ll = new LinearLayout(this);
 
-        mPlayStuff = new PlayStuff(this);
-        ll.addView(mPlayStuff,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        0));
-        setContentView(ll);
+        displayNewConfig(new ConfClass(10));
+        mPlayStuff = (Button) findViewById(R.id.button);
+        mPlayStuff.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendIntent();
+            }
+        });
+    }
+    private void sendIntent(){
+        Intent serviceIntent = new Intent(this, RecorderService.class);
+        if (!mStart) {
+            serviceIntent.setAction(RecorderService.ACTION_START_RECORD);
+            mPlayStuff.setText("Stop Playback");
+        } else {
+            serviceIntent.setAction(RecorderService.ACTION_STOP_RECORD);
+            mPlayStuff.setText("Start Playback");
+        }
+        startService(serviceIntent);
+        mStart = !mStart;
     }
     @Override
     protected void onDestroy(){
@@ -129,6 +114,11 @@ public class MainActivity extends AppCompatActivity {
         public void onServiceConnected(ComponentName name, IBinder service) {
             if (service != null) {
                 mProcessingConfig = new Messenger(service);
+                try {
+                    mProcessingConfig.send(Message.obtain(null, ProcessingService.MESSAGE_CONFIG, new Messenger(new MessageHandler())));
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
             }
         }
         @Override
@@ -141,13 +131,17 @@ public class MainActivity extends AppCompatActivity {
         if(mStart) {
             Log.v("VolumeChange", event.toString());
             Message volChange = null;
+            Toast toast = null;
             if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, -1);
+                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, new ConfClass(-1));
+                toast = Toast.makeText(this, "Volume decrease", Toast.LENGTH_SHORT);
             } else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, 1);
+                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, new ConfClass(1));
+                toast = Toast.makeText(this, "Volume increase", Toast.LENGTH_SHORT);
             }
             if (volChange != null) {
                 try {
+                    toast.show();
                     mProcessingConfig.send(volChange);
                 } catch (RemoteException e) {
                     e.printStackTrace();
@@ -158,4 +152,22 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
     //TODO volume receiver to send config change to processor
+
+    private class MessageHandler extends Handler {
+        public void handleMessage(Message msg) {
+            Log.v("RecorderMainActivity", "Incoming config change");
+            switch(msg.what){
+                case ProcessingService.MESSAGE_CONFIG_CHANGE:
+                    displayNewConfig((ConfClass)msg.obj);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    private void displayNewConfig(ConfClass msg){
+        TextView tv = (TextView) findViewById(R.id.text);
+        String text = "BandGain = " + msg.BandGains + "\nQValue = " + msg.QValue + "\nVolume = " + msg.volume;
+        tv.setText(text);
+    }
 }

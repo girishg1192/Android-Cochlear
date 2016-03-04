@@ -38,7 +38,7 @@ public class RecorderService extends Service {
     public boolean mBound;
 
     public RecorderService() {
-        bufferSize = AudioRecord.getMinBufferSize(44100,
+        bufferSize = AudioRecord.getMinBufferSize(16000,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         Log.v(TAG, "Buffer Size = " + bufferSize);
         mBound = false;
@@ -78,7 +78,7 @@ public class RecorderService extends Service {
 
     public void handleActionRecord(){
         Log.v(TAG, "Recorder buffer" + bufferSize);
-        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 44100, AudioFormat.CHANNEL_IN_STEREO,
+        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT, bufferSize);
         if(record!=null) {
             record.startRecording();
@@ -89,7 +89,7 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 50, TimeUnit.SECONDS);
+            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 20, TimeUnit.MILLISECONDS);
         }
     }
     private class AudioRecordTask implements Runnable{
