@@ -24,6 +24,7 @@ public class RecorderService extends Service {
     public static final String ACTION_START_RECORD = "edu.buffalo.record.action.ACTION_START_RECORD";
     public static final String ACTION_STOP_RECORD = "edu.buffalo.record.action.ACTION_STOP_RECORD";
     private static int seqNo = 0;
+    long startTime;
 
     private static String TAG = "RecorderService";
 
@@ -40,7 +41,7 @@ public class RecorderService extends Service {
     public boolean mBound;
 
     public RecorderService() {
-        bufferSize = AudioRecord.getMinBufferSize(16000,
+        bufferSize = AudioRecord.getMinBufferSize(8000,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         Log.v(TAG, "Buffer Size = " + bufferSize);
         mBound = false;
@@ -80,10 +81,11 @@ public class RecorderService extends Service {
 
     public void handleActionRecord(){
         Log.v(TAG, "Recorder buffer" + bufferSize);
-        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_IN_MONO,
+        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 8000, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT, bufferSize);
         if(record!=null) {
             record.startRecording();
+            startTime = System.currentTimeMillis();
             //Start up the processingService
             Message startProcess = Message.obtain(null, ProcessingService.MESSAGE_START_PROCESS);
             try {
@@ -91,7 +93,7 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 120, TimeUnit.MILLISECONDS);
+            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 60, TimeUnit.MILLISECONDS);
         }
     }
     private class AudioRecordTask implements Runnable{
@@ -99,9 +101,8 @@ public class RecorderService extends Service {
         public void run() {
             short[] buffer = new short[bufferSize];
             long time = System.currentTimeMillis();
-            Log.e(TAG, "initial time " + time);
+            Log.e("Result", "Initial" +seqNo + " " + (time - startTime));
             record.read(buffer, 0, bufferSize);
-            Log.e(TAG, "initial time 2 " + (time-System.currentTimeMillis()));
             BufferClass buffObject = new BufferClass(buffer, time, seqNo++);
             Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffObject);
             try {

@@ -21,6 +21,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import FFTHelper.Complex;
+import FFTHelper.ConfClass;
+import FFTHelper.FFT;
+
 public class ProcessingService extends Service {
     public static final String ACTION_START_PROCESS = "edu.buffalo.record.action.ACTION_START_PROCESS";
     public static final int MESSAGE_START_PROCESS = 1;
@@ -47,9 +51,12 @@ public class ProcessingService extends Service {
     private static ConfClass currConfig;
     private static double window[];
 
+    FFT fftClass = new FFT();
+
+
     public ProcessingService() {
         currConfig = new ConfClass(10);
-        int windowSize = 2048;
+        int windowSize = 1024;
         window = new double[windowSize];
         for(int n=0;n<windowSize; n++) {
             window[n] = 0.49656 * Math.cos((2 * Math.PI * n) / (windowSize - 1)) + 0.076849 * Math.cos((4 * Math.PI * n) / (windowSize - 1));
@@ -138,8 +145,8 @@ public class ProcessingService extends Service {
                 buffer = bufferQueue.remove();
                 process(buffer);
             }
-            else
-                Log.v(TAG, "No pending frames");
+           /* else
+                Log.v(TAG, "No pending frames");*/
             if(!messageQueue.isEmpty()){
                 while(!messageQueue.isEmpty()) {
                     ConfClass config = messageQueue.remove();
@@ -151,17 +158,18 @@ public class ProcessingService extends Service {
                     e.printStackTrace();
                 }
             }
+/*
             else
                 Log.v(TAG, "No pending messages");
+*/
             //TODO check config change
         }
     }
 
     private void process(BufferClass buffer_){
         short[] buffer = buffer_.buffer;
-        Log.e(TAG, "Process Start " + buffer + " " + buffer.length);
         long procStart = System.currentTimeMillis();
-        int windowSize = 2048; //Modify to allow multiple sampling rates
+        int windowSize = 1024; //Modify to allow multiple sampling rates
         Complex[] fftBins = new Complex[windowSize];
         double[] scaledValues = new double[windowSize];
         //double[] channelMagnitude = new double[22];
@@ -172,6 +180,7 @@ public class ProcessingService extends Service {
             double volMultiplier = ((double)currConfig.volume)/10;
             buffer[i] = (short) (volMultiplier * (double)buffer[i]);
         }
+        Log.e("Result", "Vol" + (System.currentTimeMillis() - procStart));
         //Blackman window
         for(int n=0; n<windowSize; n++){
             if(n<buffer.length) {
@@ -181,6 +190,8 @@ public class ProcessingService extends Service {
             else
                 scaledValues[n] = 0.0;
         }
+
+        Log.e("Result", "Windowing" + (System.currentTimeMillis() - procStart));
 
         //FFT
         for(int i=0; i<windowSize; i++){
@@ -192,9 +203,10 @@ public class ProcessingService extends Service {
             }
         }
 
-        FFT fftClass = new FFT();
         fftBins = fftClass.fft(fftBins);
         //fftBins contains interleaved real and complex parts
+        Log.e("Result", "FFT " + (System.currentTimeMillis() - procStart));
+
         for(int channels = 0; channels<22; channels++){
             //8000hz max freq, 22 channels each channel has 8000/22 = 364hz
             // 7.8125 (8000/1024) hz per bin, number of bins for 364 hz = 47
@@ -206,6 +218,7 @@ public class ProcessingService extends Service {
             magnitude = Math.sqrt(magnitude);
             channelMagnitude.add(magnitude);
         }
+        Log.e("Result", "Bandpass:" + (System.currentTimeMillis() - procStart));
 
         Collections.sort(channelMagnitude);
 //        buffer_.result = (Double[])channelMagnitude.toArray();
@@ -213,6 +226,8 @@ public class ProcessingService extends Service {
         for (int i = 0; i < buffer_.result.length; i++) {
             buffer_.result[i] = new Double((Double)(channelMagnitude.toArray())[i]);
         }
+        Log.e("Result", "Processing" + buffer_.seq + " " + (System.currentTimeMillis() - procStart));
+
         //Sort the channels and select first few
         Message packedBuffer = Message.obtain(null, ResultReceiver.RESULT_PUBLISH, buffer_);
         try {
@@ -220,9 +235,6 @@ public class ProcessingService extends Service {
         } catch (RemoteException e) {
             e.printStackTrace();
         }
-        long procEnd = System.currentTimeMillis();
-
-        Log.v(TAG, "Result: Processing time " + (procEnd-procStart));
     }
     private void configChange(ConfClass conf){
         currConfig.volume += conf.volumeChange;

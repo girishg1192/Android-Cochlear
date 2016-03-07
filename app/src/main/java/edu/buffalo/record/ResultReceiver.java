@@ -24,7 +24,7 @@ public class ResultReceiver extends Service {
             switch(msg.what){
                 case RESULT_PUBLISH:
                     BufferClass result = (BufferClass) msg.obj;
-                    Log.e(TAG, "Result: Time taken = " + result.seq + " " + (System.currentTimeMillis() - result.timeSent));
+                    Log.e("Result", "Final" + result.seq + " " + (System.currentTimeMillis() - result.timeSent));
                     break;
             }
         }

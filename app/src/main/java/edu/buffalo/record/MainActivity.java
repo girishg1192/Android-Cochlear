@@ -20,6 +20,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import FFTHelper.ConfClass;
+
 
 public class MainActivity extends AppCompatActivity {
     private static final String LOG_TAG = "AudioRecordTest";
