@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.provider.Settings;
 import android.util.Log;
 
 import java.nio.Buffer;
@@ -24,7 +25,11 @@ public class ResultReceiver extends Service {
             switch(msg.what){
                 case RESULT_PUBLISH:
                     BufferClass result = (BufferClass) msg.obj;
-                    Log.e("Result", "Final" + result.seq + " " + (System.currentTimeMillis() - result.timeSent));
+                    result.timeEnd = System.nanoTime();
+                    Log.v("RESULT"," Result" + result.seq + " BeforeRead" + result.timeBeforeRead + " AfterRead" + result.timeSent +
+                            " ProcStart" + result.timeProcStart + " FFTStart" + result.timeFFTStart +
+                            " FFTEnd" + result.timeFFTEnd +
+                            " ProcEnd" + result.timeProcEnd + " " + result.timeEnd);
                     break;
             }
         }

@@ -41,9 +41,14 @@ public class RecorderService extends Service {
     public boolean mBound;
 
     public RecorderService() {
-        bufferSize = AudioRecord.getMinBufferSize(8000,
+        bufferSize = AudioRecord.getMinBufferSize(22050,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        Log.v(TAG, "Buffer Size = " + bufferSize);
+ /*       int b16 = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int b44 = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int b48 = AudioRecord.getMinBufferSize(48000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int b22 = AudioRecord.getMinBufferSize(22050, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+*/
+//        Log.v(TAG, "Buffer Size = " + bufferSize + " " + b16 + " " + b44 + " " + b48 + " " + b22);
         mBound = false;
     }
 
@@ -81,11 +86,12 @@ public class RecorderService extends Service {
 
     public void handleActionRecord(){
         Log.v(TAG, "Recorder buffer" + bufferSize);
-        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 8000, AudioFormat.CHANNEL_IN_MONO,
+        record = new AudioRecord(MediaRecorder.AudioSource.MIC, 22050, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+
         if(record!=null) {
             record.startRecording();
-            startTime = System.currentTimeMillis();
+            startTime = System.nanoTime();
             //Start up the processingService
             Message startProcess = Message.obtain(null, ProcessingService.MESSAGE_START_PROCESS);
             try {
@@ -93,17 +99,19 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 60, TimeUnit.MILLISECONDS);
+            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 80, TimeUnit.MILLISECONDS);
         }
     }
     private class AudioRecordTask implements Runnable{
         @Override
         public void run() {
             short[] buffer = new short[bufferSize];
-            long time = System.currentTimeMillis();
-            Log.e("Result", "Initial" +seqNo + " " + (time - startTime));
+            long timeBeforeRead = System.nanoTime();
+            Log.e("Result", "Initial" +seqNo + " " + (timeBeforeRead - startTime));
             record.read(buffer, 0, bufferSize);
-            BufferClass buffObject = new BufferClass(buffer, time, seqNo++);
+            long timeAfterRead = System.nanoTime();
+//            Log.e("Result", "Initial" + seqNo + " " + (timeBeforeRead - startTime));
+            BufferClass buffObject = new BufferClass(buffer, timeBeforeRead, timeAfterRead, seqNo++);
             Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffObject);
             try {
                 //Send the buffer to Processing service

@@ -51,12 +51,12 @@ public class ProcessingService extends Service {
     private static ConfClass currConfig;
     private static double window[];
 
-    FFT fftClass = new FFT();
+    FFT fftClass = new FFT(2048);
 
 
     public ProcessingService() {
         currConfig = new ConfClass(10);
-        int windowSize = 1024;
+        int windowSize = 2048;
         window = new double[windowSize];
         for(int n=0;n<windowSize; n++) {
             window[n] = 0.49656 * Math.cos((2 * Math.PI * n) / (windowSize - 1)) + 0.076849 * Math.cos((4 * Math.PI * n) / (windowSize - 1));
@@ -119,7 +119,7 @@ public class ProcessingService extends Service {
         return START_STICKY;
     }
     private void startProcessing(){
-        scheduledTask = scheduler.scheduleAtFixedRate(new ProcessingTask(), 0, 8, TimeUnit.MILLISECONDS);
+        scheduledTask = scheduler.scheduleAtFixedRate(new ProcessingTask(), 0, 80, TimeUnit.MILLISECONDS);
     }
     private void stopProcessing(){
         //TODO clear out buffers and stuff
@@ -168,9 +168,11 @@ public class ProcessingService extends Service {
 
     private void process(BufferClass buffer_){
         short[] buffer = buffer_.buffer;
-        long procStart = System.currentTimeMillis();
-        int windowSize = 1024; //Modify to allow multiple sampling rates
-        Complex[] fftBins = new Complex[windowSize];
+        buffer_.timeProcStart = System.nanoTime();
+        int windowSize = 2048; //Modify to allow multiple sampling rates
+
+        double[] fftReal = new double[windowSize];
+        double[] fftIm = new double[windowSize];
         double[] scaledValues = new double[windowSize];
         //double[] channelMagnitude = new double[22];
         ArrayList<Double> channelMagnitude = new ArrayList<>();
@@ -180,7 +182,7 @@ public class ProcessingService extends Service {
             double volMultiplier = ((double)currConfig.volume)/10;
             buffer[i] = (short) (volMultiplier * (double)buffer[i]);
         }
-        Log.e("Result", "Vol" + (System.currentTimeMillis() - procStart));
+//        Log.e("Result", "Vol" + (System.currentTimeMillis() - procStart));
         //Blackman window
         for(int n=0; n<windowSize; n++){
             if(n<buffer.length) {
@@ -191,34 +193,36 @@ public class ProcessingService extends Service {
                 scaledValues[n] = 0.0;
         }
 
-        Log.e("Result", "Windowing" + (System.currentTimeMillis() - procStart));
+//        Log.e("Result", "Windowing" + (System.currentTimeMillis() - procStart));
 
         //FFT
         for(int i=0; i<windowSize; i++){
+            fftIm[i] = 0.0;
             if(i<buffer.length) {
-                fftBins[i] = new Complex(scaledValues[i], 0);
+                fftReal[i] = scaledValues[i];
             }
             else {
-                fftBins[i] = new Complex(0,0);
+                fftReal[i] = 0.0;
             }
         }
+        buffer_.timeFFTStart= System.nanoTime();
+        fftClass.fft(fftReal, fftIm);
+        buffer_.timeFFTEnd = System.nanoTime();
 
-        fftBins = fftClass.fft(fftBins);
         //fftBins contains interleaved real and complex parts
-        Log.e("Result", "FFT " + (System.currentTimeMillis() - procStart));
+//        Log.e("Result", "FFT " + (System.currentTimeMillis() - procStart));
 
         for(int channels = 0; channels<22; channels++){
             //8000hz max freq, 22 channels each channel has 8000/22 = 364hz
             // 7.8125 (8000/1024) hz per bin, number of bins for 364 hz = 47
             double magnitude = 0.0;
             for(int bin = channels*47; bin<(channels+1)*47 && bin<(windowSize/2); bin++){
-                double abs = fftBins[bin].abs();
-                magnitude+= abs*abs;
+                magnitude+= (fftReal[bin]*fftReal[bin]) + (fftIm[bin]*fftIm[bin]);
             }
             magnitude = Math.sqrt(magnitude);
             channelMagnitude.add(magnitude);
         }
-        Log.e("Result", "Bandpass:" + (System.currentTimeMillis() - procStart));
+//        Log.e("Result", "Bandpass:" + (System.currentTimeMillis() - procStart));
 
         Collections.sort(channelMagnitude);
 //        buffer_.result = (Double[])channelMagnitude.toArray();
@@ -226,7 +230,8 @@ public class ProcessingService extends Service {
         for (int i = 0; i < buffer_.result.length; i++) {
             buffer_.result[i] = new Double((Double)(channelMagnitude.toArray())[i]);
         }
-        Log.e("Result", "Processing" + buffer_.seq + " " + (System.currentTimeMillis() - procStart));
+//        Log.e("Result", "Processing" + buffer_.seq + " " + (System.currentTimeMillis() - procStart));
+        buffer_.timeProcEnd = System.nanoTime();
 
         //Sort the channels and select first few
         Message packedBuffer = Message.obtain(null, ResultReceiver.RESULT_PUBLISH, buffer_);
