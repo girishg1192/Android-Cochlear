@@ -1,42 +1,40 @@
 package edu.buffalo.record;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
+import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Message;
-import android.os.Messenger;
-import android.provider.Settings;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
-import java.nio.Buffer;
 
-public class ResultReceiver extends Service {
-//    public static String RESULT_PUBLISH = "edu.buffalo.record.action.RESULT_PUBLISH";
-    public static final int RESULT_PUBLISH = 1;
+public class ResultReceiver extends BroadcastReceiver {
+    public static String ACTION_RESULT_PUBLISH = "edu.buffalo.record.action.RESULT_PUBLISH";
     private static final String TAG = "ResultReceiver";
 
     public ResultReceiver() {
     }
 
-    public final Messenger mBuffer = new Messenger(new ResultHandler());
-    private class ResultHandler extends Handler {
-        public void handleMessage(Message msg) {
-            switch(msg.what){
-                case RESULT_PUBLISH:
-                    BufferClass result = (BufferClass) msg.obj;
-                    result.timeEnd = System.nanoTime();
-                    Log.v("RESULT"," Result" + result.seq + " BeforeRead" + result.timeBeforeRead + " AfterRead" + result.timeSent +
-                            " ProcStart" + result.timeProcStart + " FFTStart" + result.timeFFTStart +
-                            " FFTEnd" + result.timeFFTEnd +
-                            " ProcEnd" + result.timeProcEnd + " " + result.timeEnd);
-                    break;
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if(intent!=null){
+            if(intent.getAction().equals(ACTION_RESULT_PUBLISH)){
+                Bundle publishedValues = intent.getExtras();
+                if(publishedValues!=null){
+                    long[] times=publishedValues.getLongArray("Times");
+                    int seq = publishedValues.getInt("Seq");
+                    long timeEnd = System.nanoTime();
+                    if(times!=null) {
+                     /*   Log.v(TAG, " Result" + seq + " ProcStart" + times[0] + " FFTStart" + times[1] +
+                                " FFTEnd" + times[2] + " ProcEnd" + times[3] + " " + timeEnd);*/
+                        Log.v(TAG, times[0] + " " + times[1] +
+                                " " + times[2] + " " + times[3] + " " + timeEnd);
+                    }
+                }
             }
         }
     }
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mBuffer.getBinder();
-    }
 }

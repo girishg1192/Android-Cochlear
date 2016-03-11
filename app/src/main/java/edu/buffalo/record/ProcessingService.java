@@ -41,7 +41,7 @@ public class ProcessingService extends Service {
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> scheduledTask;
 
-    private static Queue<BufferClass> bufferQueue= new LinkedList<BufferClass>();
+    private static Queue<short[]> bufferQueue= new LinkedList<short[]>();
     private static Queue<ConfClass> messageQueue = new LinkedList<ConfClass>();
 
     public final Messenger mBuffer = new Messenger(new MessageHandler());
@@ -50,13 +50,16 @@ public class ProcessingService extends Service {
     //Processing params
     private static ConfClass currConfig;
     private static double window[];
+    int windowSize;
+    private int bufferSize;
+    private int seqNo;
 
-    FFT fftClass = new FFT(2048);
+    FFT fftClass = new FFT(128);
 
 
     public ProcessingService() {
         currConfig = new ConfClass(10);
-        int windowSize = 2048;
+        windowSize = 128;
         window = new double[windowSize];
         for(int n=0;n<windowSize; n++) {
             window[n] = 0.49656 * Math.cos((2 * Math.PI * n) / (windowSize - 1)) + 0.076849 * Math.cos((4 * Math.PI * n) / (windowSize - 1));
@@ -65,12 +68,10 @@ public class ProcessingService extends Service {
 
     @Override
     public void onCreate() {
-        bindService(new Intent(this, ResultReceiver.class), mResultConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
     public void onDestroy() {
-        unbindService(mResultConnection);
         stopProcessing();
     }
 
@@ -84,8 +85,11 @@ public class ProcessingService extends Service {
                     break;
                 case MESSAGE_CONTAINS_BUFFER:
                     BufferClass buffer = (BufferClass)msg.obj;
-                    Log.v(TAG, "Buffer " + buffer + " of size " + buffer.buffer.length);
-                    addFramesToQueue(buffer);
+                    for(int bytesRead = 0; bytesRead<buffer.buffer.length; bytesRead+=windowSize){
+                        short[] buff = new short[windowSize];
+                        System.arraycopy(buffer.buffer, bytesRead, buff, 0, windowSize);
+                        addFramesToQueue(buff);
+                    }
                     break;
                 case MESSAGE_CONFIG_CHANGE:
                     addMessageToQueue((ConfClass) msg.obj);
@@ -107,29 +111,18 @@ public class ProcessingService extends Service {
         Log.e(TAG, "Returning Binder to Processing Service");
         return mBuffer.getBinder();
     }
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId){
-        if(intent!=null){
-            Log.v(TAG, "Intent received " + intent.getAction());
-            if(ACTION_START_PROCESS.equals(intent.getAction())){
-                Log.v(TAG, "Starting processing action");
-                startProcessing();
-            }
-        }
-        return START_STICKY;
-    }
+
     private void startProcessing(){
-        scheduledTask = scheduler.scheduleAtFixedRate(new ProcessingTask(), 0, 80, TimeUnit.MILLISECONDS);
+        scheduledTask = scheduler.scheduleAtFixedRate(new ProcessingTask(), 0, 8, TimeUnit.MILLISECONDS);
     }
     private void stopProcessing(){
-        //TODO clear out buffers and stuff
         while(!bufferQueue.isEmpty()){
             bufferQueue.remove();
         }
         scheduledTask.cancel(true);
     }
 
-    private void addFramesToQueue(BufferClass buffer){
+    private void addFramesToQueue(short[] buffer){
         bufferQueue.add(buffer);
     }
     private void addMessageToQueue(ConfClass conf){
@@ -139,10 +132,13 @@ public class ProcessingService extends Service {
     private class ProcessingTask implements Runnable{
         @Override
         public void run() {
-            BufferClass buffer;
+            short[] buffer;
             //TODO while loop?
             if(!bufferQueue.isEmpty()){
-                buffer = bufferQueue.remove();
+//                if(bytesProcessed != bufferSize) {
+                    buffer = bufferQueue.remove();
+                    //TODO send striped data
+//                }
                 process(buffer);
             }
            /* else
@@ -162,19 +158,15 @@ public class ProcessingService extends Service {
             else
                 Log.v(TAG, "No pending messages");
 */
-            //TODO check config change
         }
     }
 
-    private void process(BufferClass buffer_){
-        short[] buffer = buffer_.buffer;
-        buffer_.timeProcStart = System.nanoTime();
-        int windowSize = 2048; //Modify to allow multiple sampling rates
-
+    private void process(short[] buffer){
+        long timeProcStart = System.nanoTime();
+//        int windowSize = 128; //Modify to allow multiple sampling rates
         double[] fftReal = new double[windowSize];
         double[] fftIm = new double[windowSize];
         double[] scaledValues = new double[windowSize];
-        //double[] channelMagnitude = new double[22];
         ArrayList<Double> channelMagnitude = new ArrayList<>();
 
         //Apply volume
@@ -182,7 +174,6 @@ public class ProcessingService extends Service {
             double volMultiplier = ((double)currConfig.volume)/10;
             buffer[i] = (short) (volMultiplier * (double)buffer[i]);
         }
-//        Log.e("Result", "Vol" + (System.currentTimeMillis() - procStart));
         //Blackman window
         for(int n=0; n<windowSize; n++){
             if(n<buffer.length) {
@@ -205,13 +196,13 @@ public class ProcessingService extends Service {
                 fftReal[i] = 0.0;
             }
         }
-        buffer_.timeFFTStart= System.nanoTime();
+        long timeFFTStart= System.nanoTime();
         fftClass.fft(fftReal, fftIm);
-        buffer_.timeFFTEnd = System.nanoTime();
+        long timeFFTEnd = System.nanoTime();
 
         //fftBins contains interleaved real and complex parts
 //        Log.e("Result", "FFT " + (System.currentTimeMillis() - procStart));
-
+        //Bandpass filter
         for(int channels = 0; channels<22; channels++){
             //8000hz max freq, 22 channels each channel has 8000/22 = 364hz
             // 7.8125 (8000/1024) hz per bin, number of bins for 364 hz = 47
@@ -222,24 +213,33 @@ public class ProcessingService extends Service {
             magnitude = Math.sqrt(magnitude);
             channelMagnitude.add(magnitude);
         }
-//        Log.e("Result", "Bandpass:" + (System.currentTimeMillis() - procStart));
 
         Collections.sort(channelMagnitude);
-//        buffer_.result = (Double[])channelMagnitude.toArray();
-        buffer_.result = new Double[channelMagnitude.size()];
-        for (int i = 0; i < buffer_.result.length; i++) {
-            buffer_.result[i] = new Double((Double)(channelMagnitude.toArray())[i]);
+        Double[] result = new Double[channelMagnitude.size()];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = new Double((Double)(channelMagnitude.toArray())[i]);
         }
 //        Log.e("Result", "Processing" + buffer_.seq + " " + (System.currentTimeMillis() - procStart));
-        buffer_.timeProcEnd = System.nanoTime();
+        long timeProcEnd = System.nanoTime();
 
         //Sort the channels and select first few
-        Message packedBuffer = Message.obtain(null, ResultReceiver.RESULT_PUBLISH, buffer_);
-        try {
-            mResult.send(packedBuffer);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
+
+        Intent sendResults = new Intent(this, ResultReceiver.class);
+
+        sendResults.setAction(ResultReceiver.ACTION_RESULT_PUBLISH);
+        sendResults.putExtra("OutputBuff", result);
+        sendResults.putExtra("Seq", seqNo++);
+
+        long[] times = new long[4];
+//        times[0] = buffer_.timeBeforeRead;
+//        times[1] = buffer_.timeSent; //same as afterRead
+        times[0] = timeProcStart;
+        times[1] = timeFFTStart;
+        times[2] = timeFFTEnd;
+        times[3] = timeProcEnd;
+
+        sendResults.putExtra("Times", times);
+        sendBroadcast(sendResults);
     }
     private void configChange(ConfClass conf){
         currConfig.volume += conf.volumeChange;
@@ -251,19 +251,5 @@ public class ProcessingService extends Service {
     Messenger mResult = null;
     boolean mBound = false;
 
-    private ServiceConnection mResultConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            if(service!=null) {
-                mResult = new Messenger(service);
-                mBound = true;
-            }
-        }
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            mResult = null;
-            mBound = false;
-        }
-    };
 }
 

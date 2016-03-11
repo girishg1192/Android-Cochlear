@@ -29,11 +29,15 @@
             android:enabled="true"
             android:exported="true" >
         </service>
-        <service
+        <receiver
             android:name=".ResultReceiver"
             android:enabled="true"
             android:exported="true" >
-        </service>
+            <intent-filter>
+                <action android:name="edu.buffalo.record.action.RESULT_PUBLISH">
+                </action>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

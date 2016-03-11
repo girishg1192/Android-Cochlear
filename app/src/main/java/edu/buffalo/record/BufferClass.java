@@ -20,7 +20,4 @@ public class BufferClass{
     public void printTime(){
 
     }
-    BufferClass(BufferClass frames, Double[] res){
-        timeSent = frames.timeSent;
-    }
 }
