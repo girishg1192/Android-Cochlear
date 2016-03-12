@@ -33,8 +33,6 @@ public class ProcessingService extends Service {
     public static final int MESSAGE_STOP_PROCESS = 4;
     public static final int MESSAGE_CONFIG = 5;
 
-//    public static final String ACTION_PROCESS_FRAMES = "edu.buffalo.record.action.ACTION_PROCESS_FRAMES";
-//    public static final String ACTION_CONFIG_CHANGE = "edu.buffalo.record.action.ACTION_CONFIG_CHANGE";
     private static final String TAG = "ProcessingService";
     private boolean mStarted = false;
 
@@ -51,7 +49,6 @@ public class ProcessingService extends Service {
     private static ConfClass currConfig;
     private static double window[];
     int windowSize;
-    private int bufferSize;
     private int seqNo;
 
     FFT fftClass = new FFT(128);
@@ -84,15 +81,17 @@ public class ProcessingService extends Service {
                     startProcessing();
                     break;
                 case MESSAGE_CONTAINS_BUFFER:
-                    BufferClass buffer = (BufferClass)msg.obj;
-                    for(int bytesRead = 0; bytesRead<buffer.buffer.length; bytesRead+=windowSize){
-                        short[] buff = new short[windowSize];
-                        System.arraycopy(buffer.buffer, bytesRead, buff, 0, windowSize);
-                        addFramesToQueue(buff);
+                    short[] buffer = (short[])msg.obj;
+                    for(int bytesRead = 0; bytesRead<buffer.length; bytesRead+=windowSize){
+                        short[] windowedBuffer = new short[windowSize];
+                        System.arraycopy(buffer, bytesRead, windowedBuffer, 0, windowSize);
+                        addFramesToQueue(windowedBuffer);
                     }
                     break;
                 case MESSAGE_CONFIG_CHANGE:
-                    addMessageToQueue((ConfClass) msg.obj);
+                    ConfClass message = new ConfClass((String)msg.obj);
+                    Log.e(TAG, (String)msg.obj);
+                    addMessageToQueue(message);
                     break;
                 case MESSAGE_STOP_PROCESS:
                     mStarted = false;
@@ -149,15 +148,11 @@ public class ProcessingService extends Service {
                     configChange(config);
                 }
                 try {
-                    mConfigListener.send(Message.obtain(null,MESSAGE_CONFIG_CHANGE, currConfig));
+                    mConfigListener.send(Message.obtain(null,MESSAGE_CONFIG_CHANGE, currConfig.toString()));
                 } catch (RemoteException e) {
                     e.printStackTrace();
                 }
             }
-/*
-            else
-                Log.v(TAG, "No pending messages");
-*/
         }
     }
 

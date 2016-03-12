@@ -43,12 +43,12 @@ public class RecorderService extends Service {
     public RecorderService() {
         bufferSize = AudioRecord.getMinBufferSize(22050,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
- /*       int b16 = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int b16 = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int b44 = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int b48 = AudioRecord.getMinBufferSize(48000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int b22 = AudioRecord.getMinBufferSize(22050, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-*/
-//        Log.v(TAG, "Buffer Size = " + bufferSize + " " + b16 + " " + b44 + " " + b48 + " " + b22);
+
+        Log.v(TAG, "Buffer Size = " + bufferSize + " " + b16 + " " + b44 + " " + b48 + " " + b22);
         mBound = false;
     }
 
@@ -59,14 +59,16 @@ public class RecorderService extends Service {
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.v(TAG, "Intent received = " + intent.getAction());
-        if (intent != null) {
-            final String action = intent.getAction();
-            Log.v(TAG, intent.getAction());
-            if (ACTION_START_RECORD.equals(action)) {
-                handleActionRecord();
-            }else if(ACTION_STOP_RECORD.equals(action)){
-                handleActionStop();
+        if(intent!=null) {
+            Log.v(TAG, "Intent received = " + intent.getAction());
+            if (intent != null) {
+                final String action = intent.getAction();
+                Log.v(TAG, intent.getAction());
+                if (ACTION_START_RECORD.equals(action)) {
+                    handleActionRecord();
+                } else if (ACTION_STOP_RECORD.equals(action)) {
+                    handleActionStop();
+                }
             }
         }
         return START_STICKY;
@@ -100,6 +102,7 @@ public class RecorderService extends Service {
                 e.printStackTrace();
             }
             scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 80, TimeUnit.MILLISECONDS);
+            //TODO Change periodicity for devices that use bigger frame sizes
         }
     }
     private class AudioRecordTask implements Runnable{
@@ -110,9 +113,9 @@ public class RecorderService extends Service {
             Log.e("Result", "Initial" +seqNo + " " + (timeBeforeRead - startTime));
             record.read(buffer, 0, bufferSize);
             long timeAfterRead = System.nanoTime();
-//            Log.e("Result", "Initial" + seqNo + " " + (timeBeforeRead - startTime));
-            BufferClass buffObject = new BufferClass(buffer, timeBeforeRead, timeAfterRead, seqNo++);
-            Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffObject);
+            Log.e("Result", "Initial" + seqNo++ + " " + (timeBeforeRead - startTime));
+//            BufferClass buffObject = new BufferClass(buffer, timeBeforeRead, timeAfterRead, seqNo++);
+            Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffer);
             try {
                 //Send the buffer to Processing service
                 mProcessing.send(packedBuffer);

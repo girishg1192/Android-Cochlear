@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         bindService(new Intent(this, RecorderService.class), recordService, Context.BIND_AUTO_CREATE);
         bindService(new Intent(this, ProcessingService.class), mProcessingConnection, Context.BIND_AUTO_CREATE);
 
-        displayNewConfig(new ConfClass(10));
+        displayNewConfig((new ConfClass(10)).print());
         mPlayStuff = (Button) findViewById(R.id.button);
         mPlayStuff.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -135,10 +135,12 @@ public class MainActivity extends AppCompatActivity {
             Message volChange = null;
             Toast toast = null;
             if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, new ConfClass(-1));
+                ConfClass volDown = new ConfClass(-1);
+                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, volDown.toString());
                 toast = Toast.makeText(this, "Volume decrease", Toast.LENGTH_SHORT);
             } else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, new ConfClass(1));
+                ConfClass volUp = new ConfClass(1);
+                volChange = Message.obtain(null, ProcessingService.MESSAGE_CONFIG_CHANGE, volUp.toString());
                 toast = Toast.makeText(this, "Volume increase", Toast.LENGTH_SHORT);
             }
             if (volChange != null) {
@@ -160,16 +162,16 @@ public class MainActivity extends AppCompatActivity {
             Log.v("RecorderMainActivity", "Incoming config change");
             switch(msg.what){
                 case ProcessingService.MESSAGE_CONFIG_CHANGE:
-                    displayNewConfig((ConfClass)msg.obj);
+                    ConfClass sw = new ConfClass((String)msg.obj);
+                    displayNewConfig(sw.print());
                     break;
                 default:
                     break;
             }
         }
     }
-    private void displayNewConfig(ConfClass msg){
+    private void displayNewConfig(String msg){
         TextView tv = (TextView) findViewById(R.id.text);
-        String text = "BandGain = " + msg.BandGains + "\nQValue = " + msg.QValue + "\nVolume = " + msg.volume;
-        tv.setText(text);
+        tv.setText(msg);
     }
 }
