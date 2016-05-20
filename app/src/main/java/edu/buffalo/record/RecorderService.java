@@ -47,7 +47,6 @@ public class RecorderService extends Service {
         int b44 = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int b48 = AudioRecord.getMinBufferSize(48000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int b22 = AudioRecord.getMinBufferSize(22050, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-
         Log.v(TAG, "Buffer Size = " + bufferSize + " " + b16 + " " + b44 + " " + b48 + " " + b22);
         mBound = false;
     }
@@ -101,7 +100,7 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 80, TimeUnit.MILLISECONDS);
+            scheduledTask = scheduler.scheduleAtFixedRate(new AudioRecordTask(), 0, 41, TimeUnit.MILLISECONDS);
             //TODO Change periodicity for devices that use bigger frame sizes
         }
     }
@@ -110,10 +109,10 @@ public class RecorderService extends Service {
         public void run() {
             short[] buffer = new short[bufferSize];
             long timeBeforeRead = System.nanoTime();
-            Log.e("Result", "Initial" +seqNo + " " + (timeBeforeRead - startTime));
+            Log.e("Result", "Initial" +seqNo + " " + System.currentTimeMillis());
             record.read(buffer, 0, bufferSize);
             long timeAfterRead = System.nanoTime();
-            Log.e("Result", "Initial" + seqNo++ + " " + (timeBeforeRead - startTime));
+            Log.e("Result", "Initial" + seqNo++ + " " + System.currentTimeMillis());
 //            BufferClass buffObject = new BufferClass(buffer, timeBeforeRead, timeAfterRead, seqNo++);
             Message packedBuffer = Message.obtain(null, ProcessingService.MESSAGE_CONTAINS_BUFFER, buffer);
             try {
@@ -122,7 +121,7 @@ public class RecorderService extends Service {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            Log.v(TAG , buffer + " read " + buffer.length);
+//            Log.v(TAG , buffer + " read " + buffer.length);
         }
     }
     @Override
